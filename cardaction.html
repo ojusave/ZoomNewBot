@@ -1,0 +1,71 @@
+<html>
+<head>
+  <title>CARD ACTION</title>
+  <style>
+  .button {
+    background-color: #4CAF50; /* Green */
+    border: none;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+  }
+  </style>
+
+  <script src="./sdkChatTeam.js"></script>
+  <!-- <script src="./card.js"></script> -->
+
+</head>
+<body>
+  <h2>CARD ACTION</h2>
+
+  <button type="button" class="button"
+  onclick="sendCard()">
+  THANKS FOR VOTING!!</button> 
+<script>
+  function sendCard() {
+    (async () => {
+      try {
+        const configResponse = await zoomSdkChatTeam.config({
+            size: { width: 480, height: 360 },
+            capabilities: [
+                /* Add Capabilities Here */
+                'appendCardToCompose',
+                'getSupportedJsApis',
+                'getRunningContext',
+                'closeModal',
+                'openUrl',
+            ],
+        });
+
+        console.debug('Zoom JS SDK Configuration', configResponse);
+        
+
+
+        await zoomSdkChatTeam.appendCardToCompose({
+          previewCard: {
+            clientId: "M7pkEPYnTm2J7BveFcKUpw",
+            title: "Hello",
+            description: "DEMO!!",
+            previewId: "1234",
+            sessionId: "eec006083c45426388ae13878dc75c50@conference.xmppdev.zoom.us",
+          }
+        });
+       await zoomSdkChatTeam.closeModal()
+
+
+      } catch (e) {
+          console.error(e);
+      }
+
+
+    })();
+
+
+}
+</script>
+
+</body>
+</html>
