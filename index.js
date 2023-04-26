@@ -23,7 +23,6 @@ const headers = {
       directives: {
           'default-src': 'self',
           styleSrc: ["'self'"],
-          scriptSrc: ["'self'", 'https://appssdk.zoom.us/sdk.min.js'],
           imgSrc: ["'self'", `*`],
           'connect-src': 'self',
           'base-uri': 'self',
@@ -45,8 +44,28 @@ app.get('/', (req, res) => {
 })
 
 app.get('/authorize', (req, res) => {
-  res.redirect('https://zoom.us/launch/chat?jid=robot_'+process.env.zoom_bot_jid)
-})
+  const options = {
+    url: 'https://zoom.us/oauth/token',
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + Buffer.from(process.env.zoom_client_id + ':' + process.env.zoom_client_secret).toString('base64')
+    },
+    form: {
+      grant_type: 'client_credentials'
+    }
+  };
+
+  request(options, function (error, response, body) {
+    if (!error && response.statusCode == 200) {
+      const data = JSON.parse(body);
+      token = data.access_token;
+      res.redirect('https://zoom.us/launch/chat?jid=robot_'+process.env.zoom_bot_jid);
+    } else {
+      res.status(500).send('Error getting access token');
+    }
+  });
+});
+
 
 app.get('/zoomverify/verifyzoom.html', (req, res) => {
   res.send(process.env.zoom_verification_code)
@@ -86,7 +105,7 @@ app.post('/chat', (req, res) => {
   console.log("/chat api -- appContextCache --", appContextCache);
   const reqBody = {
     'robot_jid': process.env.zoom_bot_jid,
-    'to_jid': appContextCache["sid"] + '/' + appContextCache["sid"], 
+    'to_jid': appContextCache["sid"], 
     'account_id': process.env.zoom_account_id,
     'user_jid': process.env.zoom_client_id,
     "is_markdown_support": true,
@@ -96,13 +115,10 @@ app.post('/chat', (req, res) => {
       },
       "body": [
         {
-          "text": "Here are the examples of available commands:",
-          "type": "message"
-        },
-        {
-          "text": "*Slash commands",
-          "type": "message"
+          "type": "message",
+          "text": "Here are the examples of available commands:"
         }
+     
       ]
     }
   }
@@ -115,16 +131,35 @@ app.post('/chat', (req, res) => {
         url: 'https://api.zoom.us/v2/im/chat/messages',
         method: 'POST',
         json: true,
-        body: reqBody,
+        body: {
+          'robot_jid': process.env.zoom_bot_jid,
+          'to_jid': appContextCache["sid"], 
+          'account_id': process.env.zoom_account_id,
+          'user_jid': process.env.zoom_client_id,
+          "is_markdown_support": true,
+          "content": {
+            "settings": {
+              "default_sidebar_color": "#357B2A"
+            },
+            "body": [
+              {
+                "type": "message",
+                "text": "Here are the examples of available commands:"
+              }
+           
+            ]
+          }
+        },
         
         headers: {
-          'Content-Type': 'multipart/form-data',
+          'Content-Type': 'application/json',
           'Authorization': "Bearer " + token //body.access_token
         }
       }, (error, httpResponse, body) => {
         if (error) {
           console.log('Error sending chat.', error)
         } else {
+          console.log("token:",token)
           console.log("response for zoom api call", body)
         }
       })
