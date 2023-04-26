@@ -12,22 +12,22 @@ const port = process.env.PORT || 4000
 /*  Middleware */
 const headers = {
   frameguard: {
-      action: 'sameorigin',
+    action: 'sameorigin',
   },
   hsts: {
-      maxAge: 31536000,
+    maxAge: 31536000,
   },
   referrerPolicy: 'same-origin',
   crossOriginEmbedderPolicy: false,
   contentSecurityPolicy: {
-      directives: {
-          'default-src': 'self',
-          styleSrc: ["'self'"],
-          imgSrc: ["'self'", `*`],
-          'connect-src': 'self',
-          'base-uri': 'self',
-          'form-action': 'self',
-      },
+    directives: {
+      'default-src': 'self',
+      styleSrc: ["'self'"],
+      imgSrc: ["'self'", `*`],
+      'connect-src': 'self',
+      'base-uri': 'self',
+      'form-action': 'self',
+    },
   },
 };
 
@@ -59,8 +59,9 @@ app.get('/authorize', (req, res) => {
     if (!error && response.statusCode == 200) {
       const data = JSON.parse(body);
       token = data.access_token;
-      res.redirect('https://zoom.us/launch/chat?jid=robot_'+process.env.zoom_bot_jid);
+      res.redirect('https://zoom.us/launch/chat?jid=robot_' + process.env.zoom_bot_jid);
     } else {
+      console.log("I am here", error)
       res.status(500).send('Error getting access token');
     }
   });
@@ -73,19 +74,25 @@ app.get('/zoomverify/verifyzoom.html', (req, res) => {
 
 app.get('/webview.html', (req, res) => {
   var appContext = getAppContext(req.get('x-zoom-app-context'), process.env.zoom_client_secret)
-  
+
   appContextCache = appContext
- 
+
   console.log("/webview api --- app context - ", appContext)
-  const {sid}=appContext
-  console.log ('/webview api --- SID ', sid)
+  const { sid } = appContext
+  console.log('/webview api --- SID ', sid)
   req.app.locals.sid = sid
   res.setHeader("Content-Security-Policy", "default-src 'self' * 'nonce-rAnd0m'")
   res.setHeader("X-Frame-Options", "SAMEORIGIN")
   res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
   res.setHeader("X-Content-Type-Options", "nosniff")
   res.setHeader("Referrer-Policy", "origin")
-  res.sendFile(__dirname + '/webview.html');
+  res.cookie("zoom_client_secret", process.env.zoom_client_secret)
+  if (appContext.actid === 'SendMessage') {
+    res.sendFile(__dirname + '/webview.html');
+  }
+  else if (appContext.actid === "SendMessagePreview") {
+    res.sendFile(__dirname + '/SendPreview.html');
+  }
 })
 
 app.get('/sdk.js', (req, res) => {
@@ -99,15 +106,16 @@ app.get('/card.js', (req, res) => {
 app.get('/crypto-js.js', (req, res) => {
   res.sendFile(__dirname + '/crypto-js.js');
 })
-;
+  ;
 
 app.post('/chat', (req, res) => {
   console.log("/chat api -- appContextCache --", appContextCache);
+  var input = req.body.input
   const reqBody = {
     'robot_jid': process.env.zoom_bot_jid,
-    'to_jid': appContextCache["sid"], 
+    'to_jid': appContextCache.uid+"@xmpp.zoom.us"+"/"+appContextCache.sid,
     'account_id': process.env.zoom_account_id,
-    'user_jid': process.env.zoom_client_id,
+    'user_jid': appContextCache.uid+"@xmpp.zoom.us",
     "is_markdown_support": true,
     "content": {
       "settings": {
@@ -116,9 +124,9 @@ app.post('/chat', (req, res) => {
       "body": [
         {
           "type": "message",
-          "text": "Here are the examples of available commands:"
+          "text": input
         }
-     
+
       ]
     }
   }
@@ -126,44 +134,26 @@ app.post('/chat', (req, res) => {
   console.log("/chat api -- cached chatbot token -- ", token)
   console.log('/chat api - this is the body', reqBody)
 
-     
-      request({
-        url: 'https://api.zoom.us/v2/im/chat/messages',
-        method: 'POST',
-        json: true,
-        body: {
-          'robot_jid': process.env.zoom_bot_jid,
-          'to_jid': appContextCache["sid"], 
-          'account_id': process.env.zoom_account_id,
-          'user_jid': process.env.zoom_client_id,
-          "is_markdown_support": true,
-          "content": {
-            "settings": {
-              "default_sidebar_color": "#357B2A"
-            },
-            "body": [
-              {
-                "type": "message",
-                "text": "Here are the examples of available commands:"
-              }
-           
-            ]
-          }
-        },
-        
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': "Bearer " + token //body.access_token
-        }
-      }, (error, httpResponse, body) => {
-        if (error) {
-          console.log('Error sending chat.', error)
-        } else {
-          console.log("token:",token)
-          console.log("response for zoom api call", body)
-        }
-      })
-      
+
+  request({
+    url: 'https://api.zoom.us/v2/im/chat/messages',
+    method: 'POST',
+    json: true,
+    body: reqBody,
+
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': "Bearer " + token //body.access_token
+    }
+  }, (error, httpResponse, body) => {
+    if (error) {
+      console.log('Error sending chat.', error)
+    } else {
+      console.log("token:", token)
+      console.log("response for zoom api call", body)
+    }
+  })
+
   //   }
   // })
 })
@@ -178,11 +168,11 @@ app.post('/chat', (req, res) => {
  */
 function getAppContext(header, secret = '') {
   console.log('getAppContext -- context header', header)
-  if (!header || typeof header !== 'string'){
-      throw createError(500, 'context header must be a valid string');
+  if (!header || typeof header !== 'string') {
+    throw createError(500, 'context header must be a valid string');
   }
 
-  console.log('getAppContext -- context header secret', secret)   
+  console.log('getAppContext -- context header secret', secret)
 
   const key = secret;
 
@@ -233,10 +223,10 @@ function unpack(ctx) {
   const tag = buf.slice(cipherLength);
 
   return {
-      iv,
-      aad,
-      cipherText,
-      tag,
+    iv,
+    aad,
+    cipherText,
+    tag,
   };
 }
 
@@ -252,10 +242,10 @@ function unpack(ctx) {
 function decrypt(cipherText, hash, iv, aad, tag) {
   // AES/GCM decryption
   const decipher = crypto
-      .createDecipheriv('aes-256-gcm', hash, iv)
-      .setAAD(aad)
-      .setAuthTag(tag)
-      .setAutoPadding(false);
+    .createDecipheriv('aes-256-gcm', hash, iv)
+    .setAAD(aad)
+    .setAuthTag(tag)
+    .setAutoPadding(false);
 
   const update = decipher.update(cipherText, 'hex', 'utf-8');
   const final = decipher.final('utf-8');
@@ -287,7 +277,7 @@ app.post('/new_vote', (req, res) => {
     res.send('/new_vote api -- Unauthorized request to Unsplash Chatbot for Zoom.')
   }
 
-  function getPhoto (chatbotToken) {
+  function getPhoto(chatbotToken) {
     request(`https://api.unsplash.com/photos/random?query=${req.body.payload.cmd}&orientation=landscape&client_id=${process.env.unsplash_access_key}`, (error, body) => {
       if (error) {
         console.log('/new_vote api -- getPhoto() Error getting photo from Unsplash.', error)
@@ -343,7 +333,7 @@ app.post('/new_vote', (req, res) => {
     })
   }
 
-  function sendChat (chatBody, chatbotToken) {
+  function sendChat(chatBody, chatbotToken) {
     request({
       url: 'https://api.zoom.us/v2/im/chat/messages',
       method: 'POST',
@@ -351,7 +341,7 @@ app.post('/new_vote', (req, res) => {
       body: {
         'robot_jid': process.env.zoom_bot_jid,
         'to_jid': req.body.payload.toJid,
-        "user_jid" : req.body.payload.userJid,
+        "user_jid": req.body.payload.userJid,
         'account_id': req.body.payload.accountId,
 
         'content': {
@@ -379,7 +369,7 @@ app.post('/new_vote', (req, res) => {
 
 })
 
-function getChatbotToken (callback) {
+function getChatbotToken(callback) {
   request({
     url: `https://api.zoom.us/oauth/token?grant_type=client_credentials`,
     method: 'POST',
@@ -390,20 +380,4 @@ function getChatbotToken (callback) {
     callback(error, httpResponse, body)
   })
 }
-
-async function getAccessToken () {
-  var resp = await request({
-    url: `https://api.zoom.us/oauth/token?grant_type=client_credentials`,
-    method: 'POST',
-    headers: {
-      'Authorization': 'Basic ' + Buffer.from(process.env.zoom_client_id + ':' + process.env.zoom_client_secret).toString('base64')
-    }
-  })
-  console.log("getAccessToken() -- accss tokn --", resp)
-
-  return resp.access_token;
-}
-
-
-
 app.listen(port, () => console.log(`Unsplash Chatbot for Zoom listening on port ${port}!`))
