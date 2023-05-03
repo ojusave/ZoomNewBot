@@ -1,12 +1,43 @@
-//require('dotenv').config()
+// function sendCard() {
+//   (async () => {
+//     try {
+//       var input = document.getElementById("CardSend");
+//       var value = input.value;
+//       console.log("The value of the input is: " + value);
+
+
+//       await fetch('/chat', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//         },
+//         body: JSON.stringify({
+//           "input": value
+//         })
+//       });
+
+
+//       console.log("i am here")
+//     await window.close();
+//     } catch (e) {
+//       console.log("Error when sending the card ", e);
+//     }
+   
+   
+
+//   })();
+// }
 
 function sendCard() {
   (async () => {
-    try{
+
     var input = document.getElementById("CardSend");
     var value = input.value;
-    console.log("The value of the input is: " + value);
-    let chatApiResponse = await fetch('/chat', {
+    
+    try {
+
+      console.log("Before API REQUEST")
+    await fetch('/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -15,13 +46,18 @@ function sendCard() {
         "input": value
       })
     });
+
+
+   
+      console.log("After Here I am ")
+     
       await window.close()
+
     } catch (e) {
       console.log("Error when creating preview card ", e)
     }
 
   })();
-
 
 }
 
@@ -59,12 +95,12 @@ function previewCard() {
         "content": {
           "head": {
             "type": "message",
-            "text": value+ "this is header"
+            "text": value + " this is header"
           },
           "body": [
             {
               "type": "message",
-              "text": value+ "this is body"
+              "text": value + " this is body"
             }
           ]
         }
@@ -72,7 +108,7 @@ function previewCard() {
 
       var message = JSON.stringify(content);
       //creating hmac object 
-      
+
       var timenow = Date.now().toString();
       //passing the data to be hashed
       var data = "v0:" + timenow + ":" + message;
@@ -91,8 +127,10 @@ function previewCard() {
         "signature": gen_hmac,
         "timestamp": timenow
       };
+
       await zoomSdk.composeCard(card);
-      await window.close()
+      // await window.close()
+
     } catch (e) {
       console.log("Error when creating preview card ", e)
     }
@@ -100,7 +138,6 @@ function previewCard() {
   })();
 
 }
-
 function getCookie(name) {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);

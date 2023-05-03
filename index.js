@@ -31,7 +31,7 @@ const headers = {
   },
 };
 
-const simpleCacheByUid = {};
+//const simpleCacheByUid = {};
 var appContextCache = {}
 var token = ""
 
