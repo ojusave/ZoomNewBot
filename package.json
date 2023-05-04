@@ -12,6 +12,7 @@
   "dependencies": {
     "@zoom/appssdk": "^0.16.11",
     "axios": "^1.4.0",
+    "base-64": "^1.0.0",
     "body-parser": "^1.19.0",
     "crypto-js": "^4.1.1",
     "dotenv": "^8.0.0",

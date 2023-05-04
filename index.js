@@ -1,7 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const bodyParser = require('body-parser')
-const request = require('request')
+const base64 = require('base-64');
 const helmet = require('helmet')
 const crypto = require('crypto')
 const createError = require('http-errors');
@@ -9,6 +9,7 @@ const { log } = require('console')
 const app = express()
 const axios = require('axios');
 const port = process.env.PORT || 4000
+
 
 /*  Middleware */
 const headers = {
@@ -44,28 +45,28 @@ app.get('/', (req, res) => {
   res.send('Welcome to this demo bot')
 })
 
-app.get('/authorize', (req, res) => {
-  const options = {
-    url: 'https://zoom.us/oauth/token',
-    method: 'POST',
-    headers: {
-      'Authorization': 'Basic ' + Buffer.from(process.env.zoom_client_id + ':' + process.env.zoom_client_secret).toString('base64')
-    },
-    form: {
-      grant_type: 'client_credentials'
-    }
-  };
+app.get('/authorize', async (req, res) => {
+  const credentials = `${process.env.zoom_client_id}:${process.env.zoom_client_secret}`;
+  const encodedCredentials = base64.encode(credentials);
 
-  request(options, function (error, response, body) {
-    if (!error && response.statusCode == 200) {
-      const data = JSON.parse(body);
-      token = data.access_token;
-      res.redirect('https://zoom.us/launch/chat?jid=robot_' + process.env.zoom_bot_jid);
-    } else {
-      console.log("I am here", error)
-      res.status(500).send('Error getting access token');
-    }
-  });
+  try {
+    const response = await axios({
+      method: 'POST',
+      url: 'https://zoom.us/oauth/token',
+      headers: {
+        'Authorization': `Basic ${encodedCredentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      data: 'grant_type=client_credentials'
+    });
+
+    const data = response.data;
+    token = data.access_token;
+    res.redirect(`https://zoom.us/launch/chat?jid=robot_${process.env.zoom_bot_jid}`);
+  } catch (error) {
+    console.log("Error getting access token", error);
+    res.status(500).send('Error getting access token');
+  }
 });
 
 
@@ -107,7 +108,7 @@ app.get('/card.js', (req, res) => {
 app.get('/crypto-js.js', (req, res) => {
   res.sendFile(__dirname + '/crypto-js.js');
 })
-  ;
+;
 
 app.post('/chat', async (req, res) => {
   console.log("/chat api -- appContextCache --", appContextCache);
@@ -253,129 +254,103 @@ function decrypt(cipherText, hash, iv, aad, tag) {
   return JSON.parse(decrypted);
 }
 
-app.post('/new_vote', (req, res) => {
+app.post('/new_vote', async (req, res) => {
   console.log("/new_vote api -- message sent from zoom", req)
   console.log("/new_vote api -- auth header", req.headers.authorization)
   if (req.headers.authorization === process.env.zoom_verification_token) {
-    res.status(200)
-    res.send()
-    getChatbotToken((error, httpResponse, body) => {
-      if (error) {
-        console.log('Error getting chatbot_token from Zoom.', error)
-      } else {
-        body = JSON.parse(body)
-        token = body.access_token;
-        getPhoto(body.access_token)
-        console.log("/new_vote api -- chatbot token -- ", token)
-      }
-    })
+    try {
+      const chatbotToken = await getChatbotToken();
+      const photo = await getPhoto(req.body.payload.cmd);
+      const chatBody = generateChatBody(photo, req.body.payload);
+      await sendChat(chatBody, chatbotToken);
+      console.log("/new_vote api -- chatbot token -- ", chatbotToken)
+      res.status(200).send();
+    } catch (error) {
+      console.log('Error occurred:', error);
+      res.status(500).send('/new_vote api -- Internal Server Error');
+    }
   } else {
     console.log("/new_vote api -- random testing")
-    res.status(401)
-    res.send('/new_vote api -- Unauthorized request to Unsplash Chatbot for Zoom.')
+    res.status(401).send('/new_vote api -- Unauthorized request to Unsplash Chatbot for Zoom.')
   }
 
-  function getPhoto(chatbotToken) {
-    request(`https://api.unsplash.com/photos/random?query=${req.body.payload.cmd}&orientation=landscape&client_id=${process.env.unsplash_access_key}`, (error, body) => {
-      if (error) {
-        console.log('/new_vote api -- getPhoto() Error getting photo from Unsplash.', error)
-        var errors = [
+  async function getPhoto(query) {
+    const response = await axios.get(`https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&client_id=${process.env.unsplash_access_key}`);
+    if (response.status !== 200 || response.data.errors) {
+      throw new Error('Error getting photo from Unsplash');
+    }
+    return response.data;
+  }
+
+  function generateChatBody(photo, payload) {
+    const chatBody = {
+      'robot_jid': process.env.zoom_bot_jid,
+      'to_jid': payload.toJid,
+      "user_jid": payload.userJid,
+      'account_id': payload.accountId,
+      'content': {
+        'head': {
+          'text': '/unsplash ' + payload.cmd,
+          'sub_head': {
+            'text': 'Sent by ' + payload.userName
+          }
+        },
+        'body': [
           {
             'type': 'section',
-            'sidebar_color': '#D72638',
-            'sections': [{
-              'type': 'message',
-              'text': 'Error getting photo from Unsplash.'
-            }]
-          }
-        ]
-        sendChat(errors, chatbotToken)
-      } else {
-        body = JSON.parse(body.body)
-        if (body.errors) {
-          var errors = [
-            {
-              'type': 'section',
-              'sidebar_color': '#D72638',
-              'sections': body.errors.map((error) => {
-                return { 'type': 'message', 'text': error }
-              })
-            }
-          ]
-          sendChat(errors, chatbotToken)
-        } else {
-          var photo = [
-            {
-              'type': 'section',
-              'sidebar_color': body.color,
-              'sections': [
-                {
-                  'type': 'attachments',
-                  'img_url': body.urls.regular,
-                  'resource_url': body.user.links.html,
-                  'information': {
-                    'title': {
-                      'text': 'Photo by ' + body.user.name
-                    },
-                    'description': {
-                      'text': 'Click to view on Unsplash'
-                    }
+            'sidebar_color': photo.color,
+            'sections': [
+              {
+                'type': 'attachments',
+                'img_url': photo.urls.regular,
+                'resource_url': photo.user.links.html,
+                'information': {
+                  'title': {
+                    'text': 'Photo by ' + photo.user.name
+                  },
+                  'description': {
+                    'text': 'Click to view on Unsplash'
                   }
                 }
-              ]
-            }
-          ]
-          sendChat(photo, chatbotToken)
-        }
+              }
+            ]
+          }
+        ]
       }
-    })
+    };
+    return chatBody;
   }
 
-  function sendChat(chatBody, chatbotToken) {
-    request({
+  async function sendChat(chatBody, chatbotToken) {
+    const response = await axios({
       url: 'https://api.zoom.us/v2/im/chat/messages',
       method: 'POST',
-      json: true,
-      body: {
-        'robot_jid': process.env.zoom_bot_jid,
-        'to_jid': req.body.payload.toJid,
-        "user_jid": req.body.payload.userJid,
-        'account_id': req.body.payload.accountId,
-
-        'content': {
-          'head': {
-            'text': '/unsplash ' + req.body.payload.cmd,
-            'sub_head': {
-              'text': 'Sent by ' + req.body.payload.userName
-            }
-          },
-          'body': chatBody
-        }
-      },
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + chatbotToken
-      }
-    }, (error, httpResponse, body) => {
-      if (error) {
-        console.log('Error sending chat.', error)
-      } else {
-        console.log(body)
-      }
-    })
+        'Authorization': `Bearer ${chatbotToken}`
+      },
+      data: chatBody
+    });
+    if (response.status !== 200) {
+      throw new Error('Error sending chat');
+    }
   }
 
-})
-
-function getChatbotToken(callback) {
-  request({
-    url: `https://api.zoom.us/oauth/token?grant_type=client_credentials`,
-    method: 'POST',
-    headers: {
-      'Authorization': 'Basic ' + Buffer.from(process.env.zoom_client_id + ':' + process.env.zoom_client_secret).toString('base64')
+  async function getChatbotToken() {
+    const response = await axios({
+      url: 'https://api.zoom.us/oauth/token',
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`${process.env.zoom_client_id}:${process.env.zoom_client_secret}`).toString('base64')}`
+      },
+      params: {
+        grant_type: 'client_credentials'
+      }
+    });
+    if (response.status !== 200) {
+      throw new Error('Error getting chatbot_token from Zoom');
     }
-  }, (error, httpResponse, body) => {
-    callback(error, httpResponse, body)
-  })
-}
+    return response.data.access_token;
+  }
+});
 app.listen(port, () => console.log(`Unsplash Chatbot for Zoom listening on port ${port}!`))

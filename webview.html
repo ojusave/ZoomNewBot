@@ -1,25 +1,25 @@
+<!DOCTYPE html>
 <html>
 
 <head>
   <title>DEMO</title>
-  <script src="https://appssdk.zoom.us/sdk.js" nonce="rAnd0m"></script>
-  <script src="card.js" nonce="rAnd0m"></script>
-  <script src="crypto-js.js" nonce="rAnd0m"></script>
-  <script nonce="rAnd0m">
-    document.addEventListener('DOMContentLoaded', function () {
-      document.getElementById('sendCardId')
-        .addEventListener('click', sendCard);
-    });
-
-
-  </script>
 </head>
 
 <body>
   <input type="text" id="CardSend" placeholder="This will send a message to the current chat" nonce="rAnd0m">
   <button type="button" id="sendCardId" nonce="rAnd0m">
-    Send message</button>
+    Send message
+  </button>
   <br>
+  
+  <script nonce="rAnd0m" src="https://appssdk.zoom.us/sdk.js"></script>
+  <script nonce="rAnd0m" src="card.js"></script>
+  <script nonce="rAnd0m" src="crypto-js.js"></script>
+  <script nonce="rAnd0m">
+    document.addEventListener('DOMContentLoaded', function () {
+      document.getElementById('sendCardId').addEventListener('click', sendCard);
+    });
+  </script>
 </body>
 
 </html>
