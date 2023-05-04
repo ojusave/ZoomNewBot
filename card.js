@@ -75,6 +75,8 @@ const previewCard = async () => {
       "timestamp": timenow
     };
 
+    console.log(card);
+
     await zoomSdk.composeCard(card);
     window.close();
   } catch (e) {

@@ -36,6 +36,7 @@ const headers = {
 //const simpleCacheByUid = {};
 var appContextCache = {}
 var token = ""
+var accountId = ""
 
 app.use(helmet(headers));
 
@@ -46,23 +47,24 @@ app.get('/', (req, res) => {
 })
 
 app.get('/authorize', async (req, res) => {
-  const credentials = `${process.env.zoom_client_id}:${process.env.zoom_client_secret}`;
-  const encodedCredentials = base64.encode(credentials);
-
   try {
-    const response = await axios({
-      method: 'POST',
-      url: 'https://zoom.us/oauth/token',
-      headers: {
-        'Authorization': `Basic ${encodedCredentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      data: 'grant_type=client_credentials'
-    });
+    const { zoom_client_id, zoom_client_secret, zoom_bot_jid } = process.env;
+    const credentials = `${zoom_client_id}:${zoom_client_secret}`;
+    const encodedCredentials = Buffer.from(credentials).toString('base64');
 
-    const data = response.data;
+    const { data } = await axios.post(
+      'https://zoom.us/oauth/token',
+      'grant_type=client_credentials',
+      {
+        headers: {
+          Authorization: `Basic ${encodedCredentials}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      }
+    );
+
     token = data.access_token;
-    res.redirect(`https://zoom.us/launch/chat?jid=robot_${process.env.zoom_bot_jid}`);
+    res.redirect(`https://zoom.us/launch/chat?jid=robot_${zoom_bot_jid}`);
   } catch (error) {
     console.log("Error getting access token", error);
     res.status(500).send('Error getting access token');
@@ -70,32 +72,32 @@ app.get('/authorize', async (req, res) => {
 });
 
 
+
 app.get('/zoomverify/verifyzoom.html', (req, res) => {
   res.send(process.env.zoom_verification_code)
 })
 
 app.get('/webview.html', (req, res) => {
-  var appContext = getAppContext(req.get('x-zoom-app-context'), process.env.zoom_client_secret)
-
-  appContextCache = appContext
-
-  console.log("/webview api --- app context - ", appContext)
-  const { sid } = appContext
-  console.log('/webview api --- SID ', sid)
-  req.app.locals.sid = sid
-  res.setHeader("Content-Security-Policy", "default-src 'self' * 'nonce-rAnd0m'")
-  res.setHeader("X-Frame-Options", "SAMEORIGIN")
-  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-  res.setHeader("X-Content-Type-Options", "nosniff")
-  res.setHeader("Referrer-Policy", "origin")
-  res.cookie("zoom_client_secret", process.env.zoom_client_secret)
+  const appContext = getAppContext(req.get('x-zoom-app-context'), process.env.zoom_client_secret);
+  appContextCache = appContext;
+  console.log("/webview api --- app context - ", appContext);
+  const { sid } = appContext;
+  console.log('/webview api --- SID ', sid);
+  req.app.locals.sid = sid;
+  res.set({
+    "Content-Security-Policy": "default-src 'self' * 'nonce-rAnd0m'",
+    "X-Frame-Options": "SAMEORIGIN",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "origin"
+  });
+  res.cookie("zoom_client_secret", process.env.zoom_client_secret);
   if (appContext.actid === 'SendMessage') {
     res.sendFile(__dirname + '/webview.html');
-  }
-  else if (appContext.actid === "SendMessagePreview") {
+  } else if (appContext.actid === "SendMessagePreview") {
     res.sendFile(__dirname + '/SendPreview.html');
   }
-})
+});
 
 app.get('/sdk.js', (req, res) => {
   res.sendFile(__dirname + '/sdk.js');
@@ -111,30 +113,25 @@ app.get('/crypto-js.js', (req, res) => {
 ;
 
 app.post('/chat', async (req, res) => {
-  console.log("/chat api -- appContextCache --", appContextCache);
-  var input = req.body.input
+  const input = req.body.input;
   const reqBody = {
-    'robot_jid': process.env.zoom_bot_jid,
-    'to_jid': appContextCache.uid+"@xmpp.zoom.us"+"/"+appContextCache.sid,
-    'account_id': process.env.zoom_account_id,
-    'user_jid': appContextCache.uid+"@xmpp.zoom.us",
-    "is_markdown_support": true,
-    "content": {
-      "settings": {
-        "default_sidebar_color": "#357B2A"
+    robot_jid: process.env.zoom_bot_jid,
+    to_jid: `${appContextCache.uid}@xmpp.zoom.us/${appContextCache.sid}`,
+    account_id: accountId,
+    user_jid: `${appContextCache.uid}@xmpp.zoom.us`,
+    is_markdown_support: true,
+    content: {
+      settings: {
+        default_sidebar_color: "#357B2A"
       },
-      "body": [
+      body: [
         {
-          "type": "message",
-          "text": input
+          type: "message",
+          text: input
         }
-
       ]
     }
-  }
-
-  console.log("/chat api -- cached chatbot token -- ", token)
-  console.log('/chat api - this is the body', reqBody)
+  };
 
   try {
     const response = await axios({
@@ -142,22 +139,18 @@ app.post('/chat', async (req, res) => {
       url: 'https://api.zoom.us/v2/im/chat/messages',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        Authorization: `Bearer ${token}`
       },
       data: reqBody
     });
 
-    console.log("token:", token)
-    console.log("response for zoom api call", response.data)
+    console.log("response for zoom api call", response.data);
     res.status(200).send(response.data);
   } catch (error) {
-    console.log('Error sending chat.', error)
+    console.log('Error sending chat.', error);
     res.status(500).send(error.message);
   }
 });
-
-
-
 /**
  * Decodes, parses and decrypts the x-zoom-app-context header
  * @see https://marketplace.zoom.us/docs/beta-docs/zoom-apps/zoomappcontext#decrypting-the-header-value
@@ -255,6 +248,7 @@ function decrypt(cipherText, hash, iv, aad, tag) {
 }
 
 app.post('/new_vote', async (req, res) => {
+  accountId=req.body.payload.accountId
   console.log("/new_vote api -- message sent from zoom", req)
   console.log("/new_vote api -- auth header", req.headers.authorization)
   if (req.headers.authorization === process.env.zoom_verification_token) {
@@ -287,7 +281,7 @@ app.post('/new_vote', async (req, res) => {
       'robot_jid': process.env.zoom_bot_jid,
       'to_jid': payload.toJid,
       "user_jid": payload.userJid,
-      'account_id': payload.accountId,
+      'account_id': accountId,
       'content': {
         'head': {
           'text': '/unsplash ' + payload.cmd,
@@ -331,7 +325,8 @@ app.post('/new_vote', async (req, res) => {
       },
       data: chatBody
     });
-    if (response.status !== 200) {
+    console.log('send chat response status', response.status)
+    if (response.status >= 400) {
       throw new Error('Error sending chat');
     }
   }
