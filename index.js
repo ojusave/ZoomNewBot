@@ -7,6 +7,7 @@ const crypto = require('crypto')
 const createError = require('http-errors');
 const { log } = require('console')
 const app = express()
+const axios = require('axios');
 const port = process.env.PORT || 4000
 
 /*  Middleware */
@@ -108,7 +109,7 @@ app.get('/crypto-js.js', (req, res) => {
 })
   ;
 
-app.post('/chat', (req, res) => {
+app.post('/chat', async (req, res) => {
   console.log("/chat api -- appContextCache --", appContextCache);
   var input = req.body.input
   const reqBody = {
@@ -134,29 +135,26 @@ app.post('/chat', (req, res) => {
   console.log("/chat api -- cached chatbot token -- ", token)
   console.log('/chat api - this is the body', reqBody)
 
+  try {
+    const response = await axios({
+      method: 'POST',
+      url: 'https://api.zoom.us/v2/im/chat/messages',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      data: reqBody
+    });
 
-  request({
-    url: 'https://api.zoom.us/v2/im/chat/messages',
-    method: 'POST',
-    json: true,
-    body: reqBody,
+    console.log("token:", token)
+    console.log("response for zoom api call", response.data)
+    res.status(200).send(response.data);
+  } catch (error) {
+    console.log('Error sending chat.', error)
+    res.status(500).send(error.message);
+  }
+});
 
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': "Bearer " + token //body.access_token
-    }
-  }, (error, httpResponse, body) => {
-    if (error) {
-      console.log('Error sending chat.', error)
-    } else {
-      console.log("token:", token)
-      console.log("response for zoom api call", body)
-    }
-  })
-
-  //   }
-  // })
-})
 
 
 /**

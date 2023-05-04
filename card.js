@@ -1,145 +1,89 @@
-// function sendCard() {
-//   (async () => {
-//     try {
-//       var input = document.getElementById("CardSend");
-//       var value = input.value;
-//       console.log("The value of the input is: " + value);
-
-
-//       await fetch('/chat', {
-//         method: 'POST',
-//         headers: {
-//           'Content-Type': 'application/json',
-//         },
-//         body: JSON.stringify({
-//           "input": value
-//         })
-//       });
-
-
-//       console.log("i am here")
-//     await window.close();
-//     } catch (e) {
-//       console.log("Error when sending the card ", e);
-//     }
-   
-   
-
-//   })();
-// }
-
-function sendCard() {
-  (async () => {
-
-    var input = document.getElementById("CardSend");
-    var value = input.value;
-    
-    try {
-
-      console.log("Before API REQUEST")
+const sendCard = async () => {
+  const input = document.getElementById("CardSend");
+  const value = input.value;
+  
+  try {
+    console.log("Before API REQUEST");
     await fetch('/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        "input": value
-      })
+      body: JSON.stringify({ input: value })
+    }); 
+
+    console.log("After Here I am ");
+    window.close();
+  } catch (e) {
+    console.log("Error when sending messages ", e);
+    window.close();
+  }
+};
+
+const previewCard = async () => {
+  const input = document.getElementById("CardSend");
+  const value = input.value;
+  console.log("The value of the input is: " + value);
+
+  const capabilities = [
+    'appendCardToCompose',
+    'getSupportedJsApis',
+    'getRunningContext',
+    'openUrl',
+    'composeCard',
+    'getChatContext',
+    'getAppContext'
+  ];
+
+  try {
+    const configResponse = await zoomSdk.config({
+      size: { width: 480, height: 360 },
+      capabilities
     });
 
+    const content = {
+      "content": {
+        "head": {
+          "type": "message",
+          "text": `${value} this is header`
+        },
+        "body": [
+          {
+            "type": "message",
+            "text": `${value} this is body`
+          }
+        ]
+      }
+    };
 
-   
-      console.log("After Here I am ")
-     
-      await window.close()
+    const message = JSON.stringify(content);
 
-    } catch (e) {
-      console.log("Error when creating preview card ", e)
-    }
+    const timenow = Date.now().toString();
+    const data = `v0:${timenow}:${message}`;
 
-  })();
+    const zoomClientSecret = getCookie("zoom_client_secret");
+    const gen_hmac = CryptoJS.HmacSHA256(data, zoomClientSecret).toString(CryptoJS.enc.Hex);
 
-}
-
-
-function previewCard() {
-  (async () => {
-    var input = document.getElementById("CardSend");
-    var value = input.value;
-    console.log("The value of the input is: " + value);
-    var card = {
+    const card = {
       "type": "interactiveCard",
       "previewCard": JSON.stringify({
-        "title": "DEMO",
-        "description": "Preview"
+        "title": value,
+        "description": value
       }),
       "message": JSON.stringify(content),
       "signature": gen_hmac,
       "timestamp": timenow
     };
-    try {
-      const configResponse = await zoomSdk.config({
-        size: { width: 480, height: 360 },
-        capabilities: [
-          /* Add Capabilities Here */
-          'appendCardToCompose',
-          'getSupportedJsApis',
-          'getRunningContext',
-          'openUrl',
-          'composeCard',
-          'getChatContext',
-          'getAppContext'
-        ],
-      });
-      var content = {
-        "content": {
-          "head": {
-            "type": "message",
-            "text": value + " this is header"
-          },
-          "body": [
-            {
-              "type": "message",
-              "text": value + " this is body"
-            }
-          ]
-        }
-      };
 
-      var message = JSON.stringify(content);
-      //creating hmac object 
+    await zoomSdk.composeCard(card);
+    window.close();
+  } catch (e) {
+    console.log("Error when creating preview card ", e);
+  }
+};
 
-      var timenow = Date.now().toString();
-      //passing the data to be hashed
-      var data = "v0:" + timenow + ":" + message;
-      console.log("cookies", document.cookie)
-      var zoomClientSecret = getCookie("zoom_client_secret")
-      console.log("client secret", zoomClientSecret)
-      //Creating the hmac in the required format
-      var gen_hmac = CryptoJS.HmacSHA256(data, zoomClientSecret).toString(CryptoJS.enc.Hex);
-      var card = {
-        "type": "interactiveCard",
-        "previewCard": JSON.stringify({
-          "title": value,
-          "description": value
-        }),
-        "message": JSON.stringify(content),
-        "signature": gen_hmac,
-        "timestamp": timenow
-      };
-
-      await zoomSdk.composeCard(card);
-      // await window.close()
-
-    } catch (e) {
-      console.log("Error when creating preview card ", e)
-    }
-
-  })();
-
-}
-function getCookie(name) {
+const getCookie = (name) => {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop().split(';').shift();
-}
+};
