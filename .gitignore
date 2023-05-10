@@ -1,3 +1,6 @@
 .env
 node_modules
 access_token.txt
+homebrew
+.idea
+.gitignore

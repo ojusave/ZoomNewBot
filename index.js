@@ -35,7 +35,7 @@ const headers = {
 };
 
 var appContextCache = {}
-var token = ""
+var token = "";
 var accountId = ""
 
 app.use(helmet(headers));
@@ -68,7 +68,8 @@ app.get('/authorize', async (req, res) => {
     );
 
     const { data } = response;
-    const token = data.access_token;
+    token = data.access_token; // Assign the value to the global token variable
+    console.log('Access Token:', token);
     
     res.redirect(`https://zoom.us/launch/chat?jid=robot_${zoom_bot_jid}`);
   } catch (error) {
