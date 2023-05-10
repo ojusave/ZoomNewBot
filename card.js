@@ -49,8 +49,19 @@ const previewCard = async () => {
         },
         "body": [
           {
-            "type": "message",
-            "text": `${value} this is body`
+            "type": "actions",
+            "items": [
+              {
+                "text": "Add",
+                "value": "add",
+                "style": "Primary"
+              },
+              {
+                "text": "Update",
+                "value": "update",
+                "style": "Default"
+              }
+            ]
           }
         ]
       }
@@ -78,7 +89,7 @@ const previewCard = async () => {
     console.log(card);
 
     await zoomSdk.composeCard(card);
-    window.close();
+   // window.close();
   } catch (e) {
     console.log("Error when creating preview card ", e);
   }

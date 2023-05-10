@@ -51,18 +51,18 @@ app.get('/authorize', async (req, res) => {
     const { zoom_client_id, zoom_client_secret, zoom_bot_jid } = process.env;
     const credentials = `${zoom_client_id}:${zoom_client_secret}`;
     const encodedCredentials = Buffer.from(credentials).toString('base64');
-
-    const { data } = await axios.post(
-      'https://zoom.us/oauth/token',
-      'grant_type=client_credentials',
+    const { data, config } = await axios.post(
+      `https://zoom.us/oauth/token?grant_type=authorization_code&code=${req.query.code}&redirect_uri=${process.env.redirect_uri}`,
+      null, // pass a null body
       {
         headers: {
           Authorization: `Basic ${encodedCredentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
+         // 'Content-Type': 'application/x-www-form-urlencoded',
         },
       }
     );
 
+    console.log(config); 
     token = data.access_token;
     res.redirect(`https://zoom.us/launch/chat?jid=robot_${zoom_bot_jid}`);
   } catch (error) {
@@ -73,9 +73,26 @@ app.get('/authorize', async (req, res) => {
 
 
 
+
 app.get('/zoomverify/verifyzoom.html', (req, res) => {
   res.send(process.env.zoom_verification_code)
 })
+
+app.get('/proxy', (req, res) => {
+  res.sendFile(__dirname + '/apiresponse.html')
+})
+
+const WEBVIEW_HTML_PATH = __dirname + '/webview.html';
+const SEND_PREVIEW_HTML_PATH = __dirname + '/SendPreview.html';
+
+const routeHandlers = {
+  'SendMessage': (req, res) => {
+    res.sendFile(WEBVIEW_HTML_PATH);
+  },
+  'SendMessagePreview': (req, res) => {
+    res.sendFile(SEND_PREVIEW_HTML_PATH);
+  },
+};
 
 app.get('/webview.html', (req, res) => {
   const appContext = getAppContext(req.get('x-zoom-app-context'), process.env.zoom_client_secret);
@@ -84,6 +101,7 @@ app.get('/webview.html', (req, res) => {
   const { sid } = appContext;
   console.log('/webview api --- SID ', sid);
   req.app.locals.sid = sid;
+
   res.set({
     "Content-Security-Policy": "default-src 'self' * 'nonce-rAnd0m'",
     "X-Frame-Options": "SAMEORIGIN",
@@ -91,13 +109,17 @@ app.get('/webview.html', (req, res) => {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "origin"
   });
+
   res.cookie("zoom_client_secret", process.env.zoom_client_secret);
-  if (appContext.actid === 'SendMessage') {
-    res.sendFile(__dirname + '/webview.html');
-  } else if (appContext.actid === "SendMessagePreview") {
-    res.sendFile(__dirname + '/SendPreview.html');
+
+  const routeHandler = routeHandlers[appContext.actid];
+  if (routeHandler) {
+    routeHandler(req, res);
+  } else {
+    res.sendStatus(404);
   }
 });
+
 
 app.get('/sdk.js', (req, res) => {
   res.sendFile(__dirname + '/sdk.js');
@@ -254,8 +276,8 @@ app.post('/new_vote', async (req, res) => {
   if (req.headers.authorization === process.env.zoom_verification_token) {
     try {
       const chatbotToken = await getChatbotToken();
-      const photo = await getPhoto(req.body.payload.cmd);
-      const chatBody = generateChatBody(photo, req.body.payload);
+      const recordings = await getRecordings();
+      const chatBody = generateChatBody(recordings, req.body.payload);
       await sendChat(chatBody, chatbotToken);
       console.log("/new_vote api -- chatbot token -- ", chatbotToken)
       res.status(200).send();
@@ -265,48 +287,50 @@ app.post('/new_vote', async (req, res) => {
     }
   } else {
     console.log("/new_vote api -- random testing")
-    res.status(401).send('/new_vote api -- Unauthorized request to Unsplash Chatbot for Zoom.')
+    res.status(401).send('/new_vote api -- Unauthorized request to Zoom Chatbot.');
   }
 
-  async function getPhoto(query) {
-    const response = await axios.get(`https://api.unsplash.com/photos/random?query=${query}&orientation=landscape&client_id=${process.env.unsplash_access_key}`);
+  async function getRecordings() {
+    const response = await axios.get(`https://api.zoom.us/v2/users/me/recordings?from=2023-04-11&to=2023-05-10`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
     if (response.status !== 200 || response.data.errors) {
-      throw new Error('Error getting photo from Unsplash');
+      throw new Error('Error getting recordings from Zoom');
     }
     return response.data;
   }
 
-  function generateChatBody(photo, payload) {
+  function generateChatBody(recordings, payload) {
+
+    console.log('recordings', recordings)
+
     const chatBody = {
       'robot_jid': process.env.zoom_bot_jid,
       'to_jid': payload.toJid,
       "user_jid": payload.userJid,
       'account_id': accountId,
+      'visible_to_user': true,
       'content': {
         'head': {
-          'text': '/unsplash ' + payload.cmd,
+          'text': 'Your recordings:',
           'sub_head': {
-            'text': 'Sent by ' + payload.userName
+            'text': 'Sent by ' + payload.userName,
+            
           }
         },
         'body': [
           {
             'type': 'section',
-            'sidebar_color': photo.color,
             'sections': [
-              {
-                'type': 'attachments',
-                'img_url': photo.urls.regular,
-                'resource_url': photo.user.links.html,
-                'information': {
-                  'title': {
-                    'text': 'Photo by ' + photo.user.name
-                  },
-                  'description': {
-                    'text': 'Click to view on Unsplash'
-                  }
-                }
-              }
+              
+              ...recordings.meetings.map(meeting => ({
+                'type': 'message',
+                'text': 'Meeting ID: '+ meeting.id,
+                'link': meeting.share_url
+              }))
+              
             ]
           }
         ]
@@ -314,6 +338,7 @@ app.post('/new_vote', async (req, res) => {
     };
     return chatBody;
   }
+  
 
   async function sendChat(chatBody, chatbotToken) {
     const response = await axios({
@@ -330,6 +355,8 @@ app.post('/new_vote', async (req, res) => {
       throw new Error('Error sending chat');
     }
   }
+
+
 
   async function getChatbotToken() {
     const response = await axios({
