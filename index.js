@@ -9,6 +9,7 @@ const { log } = require('console')
 const app = express()
 const axios = require('axios');
 const port = process.env.PORT || 4000
+const { getChatbotToken } = require('./chatbotToken');
 
 
 /*  Middleware */
@@ -33,7 +34,6 @@ const headers = {
   },
 };
 
-//const simpleCacheByUid = {};
 var appContextCache = {}
 var token = ""
 var accountId = ""
@@ -48,30 +48,34 @@ app.get('/', (req, res) => {
 
 app.get('/authorize', async (req, res) => {
   try {
-    const { zoom_client_id, zoom_client_secret, zoom_bot_jid } = process.env;
+    const { zoom_client_id, zoom_client_secret, zoom_bot_jid, redirect_uri } = process.env;
     const credentials = `${zoom_client_id}:${zoom_client_secret}`;
     const encodedCredentials = Buffer.from(credentials).toString('base64');
-    const { data, config } = await axios.post(
-      `https://zoom.us/oauth/token?grant_type=authorization_code&code=${req.query.code}&redirect_uri=${process.env.redirect_uri}`,
-      null, // pass a null body
+    
+    const response = await axios.post(
+      `https://zoom.us/oauth/token`,
+      null,
       {
-        headers: {
-          Authorization: `Basic ${encodedCredentials}`,
-         // 'Content-Type': 'application/x-www-form-urlencoded',
+        params: {
+          grant_type: 'authorization_code',
+          code: req.query.code,
+          redirect_uri: redirect_uri
         },
+        headers: {
+          Authorization: `Basic ${encodedCredentials}`
+        }
       }
     );
 
-    console.log(config); 
-    token = data.access_token;
+    const { data } = response;
+    const token = data.access_token;
+    
     res.redirect(`https://zoom.us/launch/chat?jid=robot_${zoom_bot_jid}`);
   } catch (error) {
-    console.log("Error getting access token", error);
+    console.log('Error getting access token', error);
     res.status(500).send('Error getting access token');
   }
 });
-
-
 
 
 app.get('/zoomverify/verifyzoom.html', (req, res) => {
@@ -135,6 +139,7 @@ app.get('/crypto-js.js', (req, res) => {
 ;
 
 app.post('/chat', async (req, res) => {
+  const chatbotToken = await getChatbotToken();
   const input = req.body.input;
   const reqBody = {
     robot_jid: process.env.zoom_bot_jid,
@@ -161,7 +166,7 @@ app.post('/chat', async (req, res) => {
       url: 'https://api.zoom.us/v2/im/chat/messages',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${chatbotToken}`
       },
       data: reqBody
     });
@@ -303,41 +308,42 @@ app.post('/new_vote', async (req, res) => {
   }
 
   function generateChatBody(recordings, payload) {
-
-    console.log('recordings', recordings)
-
+    console.log('recordings', recordings);
+  
     const chatBody = {
-      'robot_jid': process.env.zoom_bot_jid,
-      'to_jid': payload.toJid,
-      "user_jid": payload.userJid,
-      'account_id': accountId,
-      'visible_to_user': true,
-      'content': {
-        'head': {
-          'text': 'Your recordings:',
-          'sub_head': {
-            'text': 'Sent by ' + payload.userName,
-            
+      robot_jid: process.env.zoom_bot_jid,
+      to_jid: payload.toJid,
+      user_jid: payload.userJid,
+      account_id: accountId,
+      visible_to_user: true,
+      content: {
+        head: {
+          text: 'Your recordings:',
+          sub_head: {
+            text: 'Sent by ' + payload.userName
           }
         },
-        'body': [
+        body: recordings.meetings.flatMap(meeting => ([
           {
-            'type': 'section',
-            'sections': [
-              
-              ...recordings.meetings.map(meeting => ({
-                'type': 'message',
-                'text': 'Meeting ID: '+ meeting.id,
-                'link': meeting.share_url
-              }))
-              
-            ]
+            type: 'message',
+            text: 'Meeting ID: ' + meeting.id
+          },
+          {
+            type: 'message',
+            text: 'Meeting UUID: ' + meeting.uuid
+          },
+          {
+            type: 'message',
+            text: meeting.topic,
+            link: meeting.share_url
           }
-        ]
+        ]))
       }
     };
+  
     return chatBody;
   }
+  
   
 
   async function sendChat(chatBody, chatbotToken) {
@@ -355,24 +361,5 @@ app.post('/new_vote', async (req, res) => {
       throw new Error('Error sending chat');
     }
   }
-
-
-
-  async function getChatbotToken() {
-    const response = await axios({
-      url: 'https://api.zoom.us/oauth/token',
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${Buffer.from(`${process.env.zoom_client_id}:${process.env.zoom_client_secret}`).toString('base64')}`
-      },
-      params: {
-        grant_type: 'client_credentials'
-      }
-    });
-    if (response.status !== 200) {
-      throw new Error('Error getting chatbot_token from Zoom');
-    }
-    return response.data.access_token;
-  }
 });
-app.listen(port, () => console.log(`Unsplash Chatbot for Zoom listening on port ${port}!`))
+app.listen(port, () => console.log(`The recordings bot is listnening on ${port}!`))

@@ -3,7 +3,6 @@ const sendCard = async () => {
   const value = input.value;
   
   try {
-    console.log("Before API REQUEST");
     await fetch('/chat', {
       method: 'POST',
       headers: {
@@ -12,7 +11,6 @@ const sendCard = async () => {
       body: JSON.stringify({ input: value })
     }); 
 
-    console.log("After Here I am ");
     window.close();
   } catch (e) {
     console.log("Error when sending messages ", e);
