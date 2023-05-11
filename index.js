@@ -5,7 +5,7 @@ const base64 = require('base-64');
 const helmet = require('helmet')
 const crypto = require('crypto')
 const createError = require('http-errors');
-const { log } = require('console')
+const { log, error } = require('console')
 const app = express()
 const axios = require('axios');
 const port = process.env.PORT || 4000
@@ -13,6 +13,7 @@ const { getChatbotToken } = require('./chatbotToken');
 const { zoomOAuth } = require("./zoomOAuth");
 const { getRecordings } = require("./getRecordings");
 const { generateChatBody, sendChat } = require("./generateChatBody");
+const e = require('express');
 
 
 /*  Middleware */
@@ -38,7 +39,6 @@ const headers = {
 };
 
 var appContextCache = {}
-var accessToken = "";
 var accountId = "";
 exports.accountId = accountId;
 
@@ -56,12 +56,9 @@ app.get('/zoomverify/verifyzoom.html', (req, res) => {
   res.send(process.env.zoom_verification_code)
 })
 
-app.get('/proxy', (req, res) => {
-  res.sendFile(__dirname + '/apiresponse.html')
-})
-
 const WEBVIEW_HTML_PATH = __dirname + '/webview.html';
 const SEND_PREVIEW_HTML_PATH = __dirname + '/SendPreview.html';
+const RECORDINGS_FILE = __dirname + '/recordings.html';
 
 const routeHandlers = {
   'SendMessage': (req, res) => {
@@ -70,6 +67,9 @@ const routeHandlers = {
   'SendMessagePreview': (req, res) => {
     res.sendFile(SEND_PREVIEW_HTML_PATH);
   },
+  'findrecordings': (req, res) => {
+    res.sendFile(RECORDINGS_FILE);
+  }
 };
 
 app.get('/webview.html', (req, res) => {
@@ -98,6 +98,30 @@ app.get('/webview.html', (req, res) => {
   }
 });
 
+app.get('/meetingIds', async (req, res) => {
+  const { from, to } = req.query;
+  console.log("from = ", from, " , to = ", to);
+  // Validate the date format
+  const dateFormat = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateFormat.test(from) || !dateFormat.test(to)) {
+    return res.status(400).json({ error: 'Invalid date format. Please provide dates in yyyy-mm-dd format.' });
+  }
+
+    var recordings = await getRecordings(from, to);
+
+
+    console.log("recordings", recordings)
+
+    const meetingIds = recordings.meetings.flatMap(meeting => ([
+      meeting.id
+    ]));
+
+    res.json(meetingIds);
+
+});
+app.get('/recordings.js', (req, res) => {
+  res.sendFile(__dirname + '/recordings.js');
+})
 
 app.get('/sdk.js', (req, res) => {
   res.sendFile(__dirname + '/sdk.js');
@@ -110,7 +134,7 @@ app.get('/card.js', (req, res) => {
 app.get('/crypto-js.js', (req, res) => {
   res.sendFile(__dirname + '/crypto-js.js');
 })
-;
+  ;
 
 app.post('/chat', async (req, res) => {
   const chatbotToken = await getChatbotToken();
@@ -251,10 +275,12 @@ function decrypt(cipherText, hash, iv, aad, tag) {
 app.post('/:command', async (req, res) => {
   const command = req.params.command; // Extract the command from the route parameter
 
+  var from = '2023-04-10'
+  var to = '2023-05-10'
   if (req.headers.authorization === process.env.zoom_verification_token) {
     try {
       const chatbotToken = await getChatbotToken();
-      const recordings = await getRecordings();
+      const recordings = await getRecordings(from, to);
       const chatBody = generateChatBody(recordings, req.body.payload);
       await sendChat(chatBody, chatbotToken);
       res.status(200).send();

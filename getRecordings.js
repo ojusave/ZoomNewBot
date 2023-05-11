@@ -4,13 +4,13 @@ const path = require('path');
 const { refreshTokens } = require("./refreshTokens");
 
 
-async function getRecordings() {
+async function getRecordings(from, to) {
   const tokensFilePath = path.join(__dirname, 'tokens.txt');
   const tokensData = fs.readFileSync(tokensFilePath, 'utf8');
   let accessToken = tokensData.split('\n')[0].split(':')[1].trim(); // Extract the access token from the file
 
   try {
-    const response = await makeApiRequest(accessToken);
+    const response = await makeApiRequest(accessToken, from, to);
 
     if (response.status !== 200 || response.data.errors) {
       throw new Error('Error getting recordings from Zoom');
@@ -41,8 +41,8 @@ async function getRecordings() {
 }
 exports.getRecordings = getRecordings;
 
-async function makeApiRequest(accessToken) {
-  return await axios.get('https://api.zoom.us/v2/users/me/recordings?from=2023-04-11&to=2023-05-10', {
+async function makeApiRequest(accessToken, from, to) {
+  return await axios.get('https://api.zoom.us/v2/users/me/recordings?from={from}&to={to}', {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }

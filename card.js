@@ -1,23 +1,3 @@
-const sendCard = async () => {
-  const input = document.getElementById("CardSend");
-  const value = input.value;
-  
-  try {
-    await fetch('/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ input: value })
-    }); 
-
-    window.close();
-  } catch (e) {
-    console.log("Error when sending messages ", e);
-    window.close();
-  }
-};
-
 const previewCard = async () => {
   const input = document.getElementById("CardSend");
   const value = input.value;
@@ -87,7 +67,7 @@ const previewCard = async () => {
     console.log(card);
 
     await zoomSdk.composeCard(card);
-   // window.close();
+   window.close();
   } catch (e) {
     console.log("Error when creating preview card ", e);
   }
