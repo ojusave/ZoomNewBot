@@ -69,9 +69,9 @@ const routeHandlers = {
 app.get('/webview.html', (req, res) => {
   const appContext = getAppContext(req.get('x-zoom-app-context'), process.env.zoom_client_secret);
   appContextCache = appContext;
-  console.log("/webview api --- app context - ", appContext);
+  console.log("app context - ", appContext);
   const { sid } = appContext;
-  console.log('/webview api --- SID ', sid);
+  console.log('SID ', sid);
   req.app.locals.sid = sid;
 
   res.set({
