@@ -52,9 +52,7 @@ app.get('/', (req, res) => {
 
 app.get('/authorize', zoomOAuth);
 
-app.get('/zoomverify/verifyzoom.html', (req, res) => {
-  res.send(process.env.zoom_verification_code)
-})
+
 
 const WEBVIEW_HTML_PATH = __dirname + '/webview.html';
 const SEND_PREVIEW_HTML_PATH = __dirname + '/SendPreview.html';
@@ -182,22 +180,19 @@ app.get('/crypto-js.js', (req, res) => {
     }
   });
   
-
-
-
 app.post('/command/:command', async (req, res) => {
   const command = req.body.payload.cmd; // Extract the command from the route parameter
-  if('get_recording' !== command) {
-    res.status(200).send();
-    return;
-  }
+  //if('get_recording' !== command) {
+    //res.status(200).send();
+   // return;
+  //}
 
-  const [from, to] = command.split(',').map(date => date.trim()); // Extract from and to dates from the command
+  //const [from, to] = command.split(',').map(date => date.trim()); // Extract from and to dates from the command
   
   if (req.headers.authorization === process.env.zoom_verification_token) {
     try {
       const chatbotToken = await getChatbotToken();
-      const recordings = await getRecordings(from, to);
+      const recordings = await getRecordings();
       const chatBody = generateChatBody(recordings, req.body.payload);
       await sendChat(chatBody, chatbotToken);
       res.status(200).send();

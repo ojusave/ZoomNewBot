@@ -65,6 +65,7 @@
     "ipaddr.js": "^1.9.1",
     "is-typedarray": "^1.0.0",
     "isstream": "^0.1.2",
+    "js-crypto-hmac": "^1.0.4",
     "jsbn": "^0.1.1",
     "json-schema": "^0.4.0",
     "json-schema-traverse": "^0.4.1",
@@ -149,5 +150,8 @@
   "bugs": {
     "url": "https://github.com/ojusave/ZoomNewBot/issues"
   },
-  "homepage": "https://github.com/ojusave/ZoomNewBot#readme"
+  "homepage": "https://github.com/ojusave/ZoomNewBot#readme",
+  "devDependencies": {
+    "eslint": "^8.40.0"
+  }
 }

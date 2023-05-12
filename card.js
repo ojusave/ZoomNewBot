@@ -1,3 +1,4 @@
+//We use this for previewing card
 document.addEventListener('DOMContentLoaded', () => {
   const fromDate = document.getElementById('fromDate');
   const toDate = document.getElementById('toDate');
@@ -5,7 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const meetingIds = document.getElementById('meetingIds');
   const sendPreviewCardButton = document.getElementById('sendPreviewCard');
 
-  // Enable the "Get Recordings" button when both dates are selected
   fromDate.addEventListener('change', updateGetRecordingsButton);
   toDate.addEventListener('change', updateGetRecordingsButton);
 
@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   var meetingsData = {}
-  // Call the Zoom API when the "Get Recordings" button is clicked
   getRecordingsButton.addEventListener('click', async () => {
     const response = await fetch(`/meetingIds?from=${fromDate.value}&to=${toDate.value}`, { 
       method: 'GET',
@@ -41,14 +40,13 @@ document.addEventListener('DOMContentLoaded', () => {
     meetingIds.disabled = false;
   }
 
-  // Enable the "Send Preview Card" button when a meeting ID is selected
+  // Enable the "Send Preview Card" button in UI when a meeting ID is selected
   meetingIds.addEventListener('change', () => {
     if (meetingIds.value) {
       sendPreviewCardButton.disabled = false;
     }
   });
 
-  // Print the selected meeting ID and call your API when the "Send Preview Card" button is clicked
   sendPreviewCardButton.addEventListener('click', async () => {
     const selectedMeetingId = meetingIds.value;
     const meeting = meetingsData[selectedMeetingId];
@@ -81,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
               "items": [
                 {
                   "text": "Share Recording URL",
-                  "value": "add",
+                  "value": meeting.share_url,
                   "style": "Primary"
                 },
                 {
