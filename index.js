@@ -180,28 +180,28 @@ app.get('/crypto-js.js', (req, res) => {
     }
   });
   
-app.post('/command/:command', async (req, res) => {
+app.post('/:command', async (req, res) => {
   const command = req.body.payload.cmd; // Extract the command from the route parameter
-  //if('get_recording' !== command) {
-    //res.status(200).send();
-   // return;
-  //}
+  if(!command) {
+    res.status(200).send();
+   return;
+  }
 
-  //const [from, to] = command.split(',').map(date => date.trim()); // Extract from and to dates from the command
+  const [from, to] = command.split(',').map(date => date.trim()); // Extract from and to dates from the command
   
   if (req.headers.authorization === process.env.zoom_verification_token) {
     try {
       const chatbotToken = await getChatbotToken();
-      const recordings = await getRecordings();
+      const recordings = await getRecordings(from, to);
       const chatBody = generateChatBody(recordings, req.body.payload);
       await sendChat(chatBody, chatbotToken);
       res.status(200).send();
     } catch (error) {
       console.log('Error occurred:', error);
-      res.status(500).send(`/command/${command} api -- Internal Server Error`);
+      res.status(500).send(`/${command} api -- Internal Server Error`);
     }
   } else {
-    res.status(401).send(`/command/${command} api -- Unauthorized request to Zoom Chatbot.`);
+    res.status(401).send(`/${command} api -- Unauthorized request to Zoom Chatbot.`);
   }
 });
 
