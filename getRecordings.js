@@ -1,3 +1,4 @@
+//Here is the logic to make API calls from our bot
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -42,7 +43,9 @@ async function getRecordings(from, to) {
 exports.getRecordings = getRecordings;
 
 async function makeApiRequest(accessToken, from, to) {
-  return await axios.get('https://api.zoom.us/v2/users/me/recordings?from={from}&to={to}', {
+  const url = `https://api.zoom.us/v2/users/me/recordings?from=${from}&to=${to}`;
+
+  return await axios.get(url, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
     }

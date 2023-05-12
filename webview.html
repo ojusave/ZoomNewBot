@@ -1,46 +1,24 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-  <title>DEMO</title>
+  <title>Get Recordings</title>
 </head>
-
 <body>
-  <select id="cardOptions" nonce="rAnd0m">
-    <option value="Option 1">Option 1</option>
-    <option value="Option 2">Option 2</option>
-    <option value="Option 3">Option 3</option>
-  </select>
-  <button type="button" id="sendCardId" nonce="rAnd0m">
-    Send message
-  </button>
-  <br>
 
-  <script nonce="rAnd0m">
-    document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('sendCardId').addEventListener('click', handleSendCard);
-    });
+  <form id="dateForm">
+    <label for="from">From:</label>
+    <input type="date" id="from" required>
 
-    const handleSendCard = async () => {
-      const input = document.getElementById("cardOptions");
-      const value = input.value;
+    <label for="to">To:</label>
+    <input type="date" id="to" required>
 
-      try {
-        await fetch('/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ input: value })
-        });
+    <!-- <button type="submit" onclick="{(event)=>fetchRecordings(event)}">Fetch Recordings</button> -->
+    <button type="submit">Fetch Recordings</button>
+  </form>
 
-        window.close();
-      } catch (e) {
-        console.log("Error when sending messages ", e);
-        window.close();
-      }
-    };
-  </script>
+  <select id="dropdown" disabled></select>
+  <button id="sendButton" disabled>Send</button>
+
+  <script src="recordings.js" nonce="rAnd0m"></script>
 </body>
-
 </html>

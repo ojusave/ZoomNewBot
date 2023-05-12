@@ -1,3 +1,4 @@
+// This logic does OAuth when you first authorize the bot, all the subsequent token requests will be handled by refreshTokens.js
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');

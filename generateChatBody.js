@@ -1,3 +1,4 @@
+// This function generates the chatbody for your bot. This function is used when you type you / command
 const axios = require('axios');
 const { accountId } = require(".");
 
@@ -25,6 +26,10 @@ function generateChatBody(recordings, payload) {
         {
           type: 'message',
           text: 'Meeting UUID: ' + meeting.uuid
+        },
+        {
+          type: 'message',
+          text: 'Start Time: ' + meeting.start_time
         },
         {
           type: 'message',
