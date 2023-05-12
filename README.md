@@ -18,7 +18,7 @@ Before running the code, make sure you have the following libraries installed:
 1. Clone the repository to your local machine.
 
 ```bash
-git clone <repository_url>
+git clone https://github.com/ojusave/zoom-recordings-team-chat-app
 ```
 
 2. Install the required dependencies.
