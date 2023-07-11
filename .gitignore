@@ -1,7 +1,0 @@
-.env
-node_modules
-tokens.txt
-homebrew
-.idea
-.gitignore
-cache.js
