@@ -1,4 +1,3 @@
-//We use this for previewing card
 document.addEventListener('DOMContentLoaded', () => {
   const fromDate = document.getElementById('fromDate');
   const toDate = document.getElementById('toDate');
@@ -10,41 +9,29 @@ document.addEventListener('DOMContentLoaded', () => {
   toDate.addEventListener('change', updateGetRecordingsButton);
 
   function updateGetRecordingsButton() {
-    if (fromDate.value && toDate.value) {
-      getRecordingsButton.disabled = false;
-    }
+    getRecordingsButton.disabled = !(fromDate.value && toDate.value);
   }
 
-  var meetingsData = {}
+  let meetingsData = {};
   getRecordingsButton.addEventListener('click', async () => {
-    const response = await fetch(`/meetingIds?from=${fromDate.value}&to=${toDate.value}`, { 
-      method: 'GET',
-      headers: {
-        
-      },
-    });
+    const response = await fetch(`/meetingIds?from=${fromDate.value}&to=${toDate.value}`);
     meetingsData = await response.json();
-    console.log("meetingIds ==>", meetingsData);
     populateMeetingIdsDropdown(meetingsData);
   });
-  
 
   function populateMeetingIdsDropdown(meetings) {
     meetingIds.innerHTML = '';
     for (const id in meetings) {
       const option = document.createElement('option');
       option.text = meetings[id].id;
-      option.value =  meetings[id].id;
+      option.value = meetings[id].id;
       meetingIds.appendChild(option);
     }
     meetingIds.disabled = false;
   }
 
-  // Enable the "Send Preview Card" button in UI when a meeting ID is selected
   meetingIds.addEventListener('change', () => {
-    if (meetingIds.value) {
-      sendPreviewCardButton.disabled = false;
-    }
+    sendPreviewCardButton.disabled = !meetingIds.value;
   });
 
   sendPreviewCardButton.addEventListener('click', async () => {
@@ -60,60 +47,39 @@ document.addEventListener('DOMContentLoaded', () => {
       'getChatContext',
       'getAppContext'
     ];
-  
+
     try {
-      const configResponse = await zoomSdk.config({
-        size: { width: 480, height: 360 },
-        capabilities
-      });
-  
+      await zoomSdk.config({ size: { width: 480, height: 360 }, capabilities });
+
       const content = {
         "content": {
-          "head": {
+          "head": { "type": "message", "text": `Meeting ID: ${meeting.id}` },
+          "body": [{
             "type": "message",
-            "text": `Meeting ID: ` + meeting.id
-          },
-          "body": [
-            {
-              "type": "actions",
-              "items": [
-                {
-                  "text": "Share Recording URL",
-                  "value": meeting.share_url,
-                  "style": "Primary"
-                },
-                {
-                  "text": "Download Recording",
-                  "value": "update",
-                  "style": "Default"
-                }
-              ]
-            }
-          ]
+            "text": "Share Recording URL " + meeting.share_url
+          }]
         }
       };
-  
+
       const message = JSON.stringify(content);
-  
-      const timenow = Date.now().toString();
-      const data = `v0:${timenow}:${message}`;
-  
-      const zoomClientSecret = getCookie("zoom_client_secret");
-      const gen_hmac = CryptoJS.HmacSHA256(data, zoomClientSecret).toString(CryptoJS.enc.Hex);
-  
-      const card = {
-        "type": "interactiveCard",
-        "previewCard": JSON.stringify({
-          "title": "Meeting ID: "+ meeting.id,
-          "description": "Share URL: " + meeting.share_url
-        }),
-        "message": JSON.stringify(content),
-        "signature": gen_hmac,
-        "timestamp": timenow
-      };
-  
-      console.log(card);
-  
+        // Call the /sign endpoint to get the signature and timestamp
+  const res = await fetch('/sign', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ message })
+  });
+  const { signature, timestamp } = await res.json();
+
+  const card = {
+    "type": "interactiveCard",
+    "previewCard": JSON.stringify({ "title": `Meeting ID: ${meeting.id}`, "description": `Share URL: ${meeting.share_url}` }),
+    "message": message,
+    "signature": signature,
+    "timestamp": timestamp
+  };
+
       await zoomSdk.composeCard(card);
       window.close();
     } catch (e) {
@@ -121,8 +87,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
-const getCookie = (name) => {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-};

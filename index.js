@@ -14,6 +14,7 @@ const { generateChatBody, sendChat } = require("./generateChatBody");
 const e = require('express');
 const { getAppContext } = require("./getAppContext");
 const { title } = require('process')
+const crypto = require('crypto');
 
 
 /*  Middleware */
@@ -52,7 +53,16 @@ app.get('/', (req, res) => {
 
 app.get('/authorize', zoomOAuth);
 
-
+app.post('/sign', (req, res) => {
+  const { message } = req.body;
+  const timestamp = Date.now().toString();
+  const dataToSign = `v0:${timestamp}:${message}`;
+  const signature = crypto.createHmac('sha256', process.env.zoom_client_secret)
+    .update(dataToSign)
+    .digest('hex');
+  
+  res.json({ signature, timestamp });
+});
 
 const WEBVIEW_HTML_PATH = __dirname + '/webview.html';
 const SEND_PREVIEW_HTML_PATH = __dirname + '/SendPreview.html';
@@ -74,15 +84,16 @@ app.get('/webview.html', (req, res) => {
   console.log('SID ', sid);
   req.app.locals.sid = sid;
 
+  const nonce = crypto.randomBytes(16).toString('hex');
+
   res.set({
-    "Content-Security-Policy": "default-src 'self' * 'nonce-rAnd0m'",
+    "Content-Security-Policy": `default-src 'self' * 'nonce-${nonce}'`,
     "X-Frame-Options": "SAMEORIGIN",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "origin"
   });
 
-  res.cookie("zoom_client_secret", process.env.zoom_client_secret);
 
   const routeHandler = routeHandlers[appContext.actid];
   if (routeHandler) {
@@ -132,7 +143,7 @@ app.get('/crypto-js.js', (req, res) => {
 })
   ;
 
-  app.post('/chat', async (req, res) => {
+app.post('/chat', async (req, res) => {
     const chatbotToken = await getChatbotToken();
     
     // Extract id and share_url from the request body
